@@ -1,0 +1,53 @@
+# config/settings.yaml — 실행 설정 (PRD v1.1 3.1.3, 3.2.1, 3.4, 3.6)
+
+period:
+  default_from: "2026-09-01"
+  default_to:   "2026-11-08"
+  daily_lookback_days: 3          # 매일 실행할 때 최근 N일을 다시 조회 (늦게 색인되는 기사 대비)
+
+# v1.1 Q8: site_search 매체(철강금속신문, 스틸데일리)에만 사용. 단어 1개만 허용 (두 단어 검색은 0건)
+keywords:
+  - "철스크랩"
+  - "고철"
+  - "매입가격"
+  - "구매가격"
+
+prefilter:                         # Claude 호출 전 제목과 요약문으로 거르는 조건
+  must_include_any: ["스크랩", "고철", "철스크랩", "생철", "중량", "경량", "매입", "구매가", "價"]
+  exclude_if_title_has: ["철근 판매", "열연 유통", "부고", "인사", "선물지표", "LME"]
+
+# v1.1 Q2: Anthropic API 키 대신 Claude Code 비대화형 모드(claude -p) 사용
+llm:
+  provider: claude_cli             # claude_cli | mock   (anthropic_api는 향후 전환용 자리만)
+  model: "claude-sonnet-5-5"       # claude -p --model 값. 정확도가 부족하면 claude-opus-5-5
+  max_input_chars: 6000            # 본문을 이 길이로 자름
+  timeout_sec: 180                 # claude -p 호출 1건 제한 시간
+  retries: 1                       # 오류·검증 실패 시 재시도 횟수 (이후 llm_error)
+  max_attempts_per_article: 3      # llm_error 기사를 다음 실행에서 다시 처리하는 최대 횟수
+  claude_cli:
+    executable: "claude"           # shutil.which로 찾음 (Windows: claude.CMD)
+    extra_args: ["--tools", "", "--no-session-persistence"]
+    workdir: null                  # null이면 프로젝트 밖 임시 폴더 사용 (프로젝트 CLAUDE.md가 문맥에 섞이지 않게)
+    check_auth: true               # 실행 전 `claude auth status --json`의 loggedIn 확인
+  mock:
+    responses_dir: "tests/fixtures/mock_responses"
+
+verify:
+  max_tasks_per_run: 20            # 원본 추가 검색 실행당 최대 건수
+  max_attempts: 3                  # 3회 실패 시 not_found
+  search_window_days: 21           # 적용일자 −21일 ~ 적용일자
+
+monitoring:
+  log_oldest_published: true       # v1.1 Q7: 매체·키워드별 가장 오래된 수집 기사 게재일 기록
+  warn_on_possible_gap: true       # 한도 도달 + oldest > date_from 이면 경고
+
+# v1.1 Q6: 회사 PC에서 수집 → GitHub 비공개 저장소 → Streamlit Cloud 표시 전용
+publish:
+  git_push: true                   # run_daily.ps1에서 커밋·푸시
+  allowed_paths:                   # 이 목록 밖의 파일이 스테이징되면 푸시 중단
+    - "data/scrap.db"
+    - "data/exports/adopted.csv"
+  commit_message: "data: daily update {date}"
+
+app:
+  mode: collector                  # collector(회사 PC) | viewer(Streamlit Cloud). 환경 변수 APP_MODE가 우선

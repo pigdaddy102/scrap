@@ -1,0 +1,43 @@
+# config/steelmakers.yaml — 대상 제강사, 공장, 색상, 표시 순서 (PRD v1.1 부록 A)
+# 목록 순서 = 화면·출력의 제강사 정렬 순서. plants 순서 = 공장별 표기 순서.
+
+steelmakers:
+  - name: 현대제철
+    short: 현대
+    aliases: ["현대제철", "현대"]
+    plants: [포항, 인천, 당진]
+    color: "#1f77b4"
+  - name: 포스코
+    short: 포스코
+    aliases: ["포스코", "POSCO"]
+    plants: [광양, 포항]
+    color: "#2ca02c"
+  - name: 동국제강
+    short: 동국
+    aliases: ["동국제강", "동국"]
+    plants: [포항, 인천, 당진]       # TODO [확인 필요] C11 실제 발표 단위와 맞는지 백필 후 확인
+    color: "#ff7f0e"
+  - name: 대한제강
+    short: 대한
+    aliases: ["대한제강", "대한"]
+    plants: []
+    color: "#9467bd"
+  - name: 한국철강
+    short: 한철
+    aliases: ["한국철강"]
+    plants: []
+    color: "#8c564b"
+  - name: 한국특강
+    short: 한특
+    aliases: ["한국특강"]
+    plants: []
+    color: "#e377c2"
+
+# v1.1 Q5: 등급명은 기사 표현 그대로 저장. 표준 등급 매핑은 추후 업데이트 예정
+# v1.2: '전 등급' → '전등급'만 통합. map에 없는 등급은 기사 표현 그대로 (원문은 grade_raw에 유지)
+grades_standard: []
+grade_mapping:
+  enabled: true
+  map:
+    "전 등급": "전등급"
+    # 추후 추가 예: "생철": "생철류"

@@ -1,0 +1,11 @@
+# PRD v1.2 5.2 — LLM은 claude -p(Claude Code CLI)를 쓰므로 anthropic SDK는 넣지 않는다
+requests>=2.32
+beautifulsoup4>=4.12
+trafilatura>=2.0
+pydantic>=2.8
+pyyaml>=6.0
+python-dotenv>=1.0
+streamlit>=1.40
+streamlit-calendar>=1.2
+pandas>=2.2
+pytest>=8.0

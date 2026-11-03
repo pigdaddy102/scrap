@@ -1,0 +1,104 @@
+# config/media.yaml — 수집 매체 목록과 순서 (PRD v1.1 3.1.1)
+# 근거: docs/DAY0_REPORT.md (2026-11-03 조사)
+# v1.1: 네이버 API 제거, 지정 4개 매체만 수집 (Q1)
+# 수집 순서: order 오름차순. 스틸데일리는 다른 매체를 모두 수집한 뒤 마지막(order 99).
+
+defaults:
+  request_interval_sec: 3        # 같은 도메인에 연속 요청할 때 최소 간격 (PRD 6장)
+  timeout_sec: 15
+  max_retries: 2
+  max_pages_per_keyword: 5       # v1.1 Q7: 키워드(section_list는 목록)당 5페이지, 백필·일일 동일
+  user_agent: "ScrapPriceTracker/0.1 (educational project)"
+
+# 4개 매체 모두 ndsoft CMS (/news/articleList.html, /news/articleView.html?idxno=N).
+# 목록 공통 파라미터: sc_sdate=YYYY-MM-DD, sc_edate=YYYY-MM-DD (기간 필터, 4개 매체 모두 동작 확인), page=N, view_type=sm
+# 본문 공통 선택자: #article-view-content-div (itemprop="articleBody")
+# 게재일 공통: <meta property="article:published_time"> (ISO8601, +09:00)
+# 로그인 정보(아이디·비밀번호·쿠키)는 넣지 않는다 (v1.1 Q9). 회사 IP 인증으로 보이는 범위만 사용.
+# access 값은 구독 협약이 없는 개발 PC에서 확인한 비회원 기준이다 (v1.2).
+# TODO [확인 필요] C4 회사 PC에서 `python -m app.collectors.check_access` 실행 후 확정
+
+media:
+  - id: snmnews
+    name: 철강금속신문
+    order: 1
+    enabled: true
+    method: site_search
+    base_url: "https://www.snmnews.com"
+    search_url: "/news/articleList.html?sc_area=A&view_type=sm&sc_word={keyword}&sc_sdate={date_from}&sc_edate={date_to}&page={page}"
+    keyword_encoding: utf-8
+    single_keyword_only: true      # 두 단어 검색은 0건 → 단어 1개씩만 검색
+    parser: ndsoft
+    selectors:
+      item: "section.article-list-content .list-block"
+      title: ".list-titles a strong"
+      link: ".list-titles a"
+      date: ".list-dated"            # "섹션 | 기자 | YYYY-MM-DD HH:MM", 마지막 토큰 사용
+    page_size: 30
+    access: full                     # 표본 기사 본문 비로그인 열람 가능 (C4)
+
+  - id: scrapwatch
+    name: 스크랩워치
+    order: 2
+    enabled: true
+    method: section_list
+    base_url: "https://www.scrapwatch.co.kr"
+    # 키워드(sc_word)와 섹션(sc_sub_section_code) 파라미터가 무시되고 기간 필터만 동작함
+    # → 기간 내 전체 기사 목록을 넘기며 제목으로 사전 필터
+    # 참고: 2026-09-01~11-08 전체 398건(약 20페이지) → 5페이지 한도에서는 백필 앞부분이 빠질 수 있음.
+    #       run_log의 oldest_published / possible_gap으로 확인 (PRD 3.1.4)
+    # 2026-11-03 확인: page 파라미터가 무시되어 몇 페이지를 요청해도 1페이지(최신 20건)만 나옴 (세션·Referer로도 동일)
+    # → 페로타임즈와 같은 방식: 기간을 window_days 단위로 나눠 구간마다 1페이지. 기사 약 6~7건/일 → 2일 구간(약 13건)
+    #   5구간 = 10일. 일일 실행(최근 3일)은 2구간으로 충분. 백필은 10일 이하 기간으로 나눠 여러 번 실행해야 함
+    list_url: "/news/articleList.html?view_type=sm&sc_sdate={date_from}&sc_edate={date_to}"
+    paging: date_windows
+    window_days: 2
+    parser: ndsoft_altlist           # 신형 ndsoft 스킨 (altlist)
+    selectors:
+      item: "li.altlist-text-item"
+      title: ".altlist-subject a"
+      link: ".altlist-subject a"
+      date: ".altlist-info-item:last-child"   # "MM-DD HH:MM" (연도 없음) → 기사 페이지 article:published_time으로 확정
+    page_size: 20
+    access: partial                  # 개발 PC(비회원)에서 '유료회원전용기사' 안내 표시 (C4). 제목에 단가 정보가 많음
+
+  - id: ferrotimes
+    name: 페로타임즈
+    order: 3
+    enabled: true
+    method: section_list
+    base_url: "https://www.ferrotimes.com"
+    # 키워드 검색이 동작하지 않음(GET UTF-8/EUC-KR, POST 모두 결과 없음 또는 전체 목록)
+    # → '고철트랙' 섹션(S1N34) 목록을 기간 필터로 수집 (2026-10-01~11-08: 35건)
+    parser: ndsoft
+    selectors:
+      item: "section.article-list-content .list-block, section.article-list-content .table-row"  # 레이아웃 2종
+      title: ".list-titles a strong"
+      link: ".list-titles a"
+      date: ".list-dated"            # "섹션 | 기자 | YYYY-MM-DD HH:MM"
+    page_size: 20
+    # 2026-11-03 확인: URL에 page 파라미터가 붙으면(page=1 포함) 섹션 필터가 풀려 관련 없는 최신 기사가 나옴.
+    # → 사용자 결정: 기간을 window_days 단위로 나눠 구간마다 page 없이 1페이지씩 조회 (구간 수 ≤ 페이지 한도 5)
+    #   8일 × 5구간 = 40일. 한 구간이 page_size(20건)로 꽉 차면 누락 가능 경고
+    list_url: "/news/articleList.html?sc_section_code=S1N34&view_type=sm&sc_sdate={date_from}&sc_edate={date_to}"
+    paging: date_windows
+    window_days: 8
+    access: full
+
+  - id: steeldaily
+    name: 스틸데일리
+    order: 99                        # 업무 규칙: 다른 매체를 모두 수집한 뒤 마지막에 수집
+    enabled: true
+    method: site_search
+    base_url: "https://www.steeldaily.co.kr"
+    search_url: "/news/articleList.html?sc_area=A&view_type=sm&sc_word={keyword}&sc_sdate={date_from}&sc_edate={date_to}&page={page}"
+    keyword_encoding: utf-8
+    single_keyword_only: true        # 두 단어 검색은 0건
+    parser: ndsoft
+    selectors:
+      item: "#section-list ul.type2 > li"
+      title: "h4.titles a"
+      link: "h4.titles a"
+      date: ".byline em:first-child" # "YYYY-MM-DD HH:MM"
+    page_size: 20
+    access: mixed                    # 같은 기사가 시간에 따라 유료→전문으로 바뀜 (C4) → 기사마다 partial 판정
